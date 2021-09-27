@@ -1,5 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using RabbitMQ.Client;
+using ServicesInterfaces.Global;
 using ServicesInterfaces.Scheduler;
 using ServicesModels;
 using System;
@@ -12,28 +14,38 @@ namespace MessagesQueue
 {
     public class Queue : IQueue
     {
+        private readonly IAppSettings appSettings;
+        private IList<AmqpTcpEndpoint> endpoints;
+        public Queue(IAppSettings _appSettings)
+        {
+            appSettings = _appSettings;
+            InitAmqp();
+        }
+        public void InitAmqp()
+        { 
+            endpoints = new List<AmqpTcpEndpoint>();
+            foreach (var port in appSettings.QueuePorts)
+            {
+                endpoints.Add(new AmqpTcpEndpoint(appSettings.HostName, port));
+            }
+        }
         public void QueueMessage(Message message)
         {
-            ConnectionFactory factory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                Port = 5672
-            };
+            ConnectionFactory factory = new ConnectionFactory();
             try
             {
-
-                using (var connection = factory.CreateConnection())
+                using (var connection = factory.CreateConnection(endpoints))
                 {
                     using (var channel = connection.CreateModel())
                     {
-                        channel.QueueDeclare(queue: "messages",
+                        channel.QueueDeclare(queue: appSettings.Queue,
                                              durable: false,
                                              exclusive: false,
                                              autoDelete: false,
                                              arguments: null);
                         var body = SerializeJson(message);
                         channel.BasicPublish(exchange: "",
-                                             routingKey: "messages",
+                                             routingKey: appSettings.Queue,
                                              basicProperties: null,
                                              body: body);
                     }
