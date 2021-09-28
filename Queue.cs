@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using ServicesInterfaces.Global;
@@ -14,26 +15,38 @@ namespace MessagesQueue
 {
     public class Queue : IQueue
     {
+        private readonly ILogger<Queue> _logger;
         private readonly IAppSettings appSettings;
         private IList<AmqpTcpEndpoint> endpoints;
-        public Queue(IAppSettings _appSettings)
+        public Queue(IAppSettings _appSettings, ILogger<Queue> logger)
         {
             appSettings = _appSettings;
+            _logger = logger;
             InitAmqp();
         }
         public void InitAmqp()
-        { 
-            endpoints = new List<AmqpTcpEndpoint>();
-            foreach (var port in appSettings.QueuePorts)
+        {
+            try
             {
-                endpoints.Add(new AmqpTcpEndpoint(appSettings.HostName, port));
+                endpoints = new List<AmqpTcpEndpoint>();
+                foreach (var port in appSettings.QueuePorts)
+                {
+                    endpoints.Add(new AmqpTcpEndpoint(appSettings.HostName, port));
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+
+                throw;
             }
         }
         public void QueueMessage(Message message)
         {
-            ConnectionFactory factory = new ConnectionFactory();
             try
             {
+                ConnectionFactory factory = new ConnectionFactory();
                 using (var connection = factory.CreateConnection(endpoints))
                 {
                     using (var channel = connection.CreateModel())
@@ -51,18 +64,27 @@ namespace MessagesQueue
                     }
                 }
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
-                throw e;
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+                throw;
             }
         }
         public byte[] SerializeJson(Message message)
         {
-            var newMessage = JsonConvert.SerializeObject(message);
-            var encoded = Encoding.UTF8.GetBytes(newMessage);
-            return encoded;
+            try
+            {
+                var newMessage = JsonConvert.SerializeObject(message);
+                var encoded = Encoding.UTF8.GetBytes(newMessage);
+                return encoded;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+                throw;
+            }
         }
-
-
     }
 }
