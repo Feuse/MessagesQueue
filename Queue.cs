@@ -22,7 +22,7 @@ namespace MessagesQueue
         {
             appSettings = _appSettings;
             _logger = logger;
-            InitAmqp();
+            //InitAmqp();
         }
         public void InitAmqp()
         {
@@ -46,9 +46,11 @@ namespace MessagesQueue
         {
             try
             {
-                ConnectionFactory factory = new ConnectionFactory();
-                using (var connection = factory.CreateConnection(endpoints))
+                ConnectionFactory factory = new ConnectionFactory() { Uri = new Uri(appSettings.AMQP_URL) };
+
+                using (var connection = factory.CreateConnection())
                 {
+
                     using (var channel = connection.CreateModel())
                     {
                         channel.QueueDeclare(queue: appSettings.Queue,
